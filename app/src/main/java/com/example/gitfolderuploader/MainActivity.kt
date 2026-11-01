@@ -1,55 +1,52 @@
 package com.example.gitfolderuploader
 
 import android.app.Activity
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.os.Build
-import android.provider.Settings
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.runtime.LaunchedEffect
-import androidx.core.content.FileProvider
-import kotlinx.coroutines.delay
-import java.io.File
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -61,6 +58,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,16 +66,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.delay
+import java.io.File
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -91,29 +98,191 @@ class MainActivity : ComponentActivity() {
 
 // ───────────────────────── ছোট ছোট UI অংশ ─────────────────────────
 
+/** বাটনের ভেতরে আইকন + লেখা */
 @Composable
-private fun Pill(text: String, color: Color) {
+private fun BtnLabel(icon: ImageVector, text: String, weight: FontWeight? = null) {
+    Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+    Spacer(Modifier.width(8.dp))
+    Text(text, fontWeight = weight)
+}
+
+@Composable
+private fun IconBadge(icon: ImageVector, bg: Color, fg: Color, size: Dp = 40.dp) {
+    Box(
+        Modifier
+            .size(size)
+            .background(bg, RoundedCornerShape(12.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(size * 0.55f))
+    }
+}
+
+@Composable
+private fun Pill(text: String, color: Color, icon: ImageVector? = null) {
     Surface(
         shape = RoundedCornerShape(50),
         color = color.copy(alpha = 0.10f),
         border = BorderStroke(1.dp, color.copy(alpha = 0.35f)),
     ) {
-        Text(
-            text,
-            color = color,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
-        )
+        Row(
+            Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (icon != null) {
+                Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(13.dp))
+                Spacer(Modifier.width(4.dp))
+            }
+            Text(text, color = color, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+/** উপরের গ্রেডিয়েন্ট হেডার */
+@Composable
+private fun Hero(account: String?) {
+    val brush = Brush.linearGradient(
+        if (isSystemInDarkTheme()) listOf(Color(0xFF1E40AF), Color(0xFF4338CA))
+        else listOf(Color(0xFF2563EB), Color(0xFF4F46E5))
+    )
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(brush)
+            .padding(20.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Box(
+                    Modifier
+                        .size(50.dp)
+                        .background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(15.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Ic.CloudUpload, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+                }
+                Column {
+                    Text(
+                        "Git Folder Uploader",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        "আপনার ফোল্ডার, সোজা GitHub-এ",
+                        color = Color.White.copy(alpha = 0.85f),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(Color.White.copy(alpha = 0.16f))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            ) {
+                Icon(
+                    if (account != null) Ic.CheckCircle else Ic.Lock,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    if (account != null) "@$account হিসেবে সংযুক্ত" else "এখনো লগইন করা নেই",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+        }
+    }
+}
+
+/** আপলোড | বিল্ড ও APK — আইকনসহ ট্যাব */
+@Composable
+private fun SegmentedTabs(selected: Int, onSelect: (Int) -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Surface(color = cs.surfaceVariant, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            listOf(Ic.CloudUpload to "আপলোড", Ic.Build to "বিল্ড ও APK").forEachIndexed { i, (icon, label) ->
+                val sel = selected == i
+                Row(
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (sel) cs.surface else Color.Transparent)
+                        .clickable { onSelect(i) }
+                        .padding(vertical = 11.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = if (sel) cs.primary else cs.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        label,
+                        color = if (sel) cs.primary else cs.onSurfaceVariant,
+                        fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Medium,
+                    )
+                }
+            }
+        }
     }
 }
 
 @Composable
 private fun StepCard(
-    number: Int,
+    icon: ImageVector,
     title: String,
     subtitle: String?,
     done: Boolean,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val cs = MaterialTheme.colorScheme
+    val ok = successColor()
+    Card(
+        colors = CardDefaults.cardColors(containerColor = cs.surface),
+        border = BorderStroke(1.dp, cs.outline),
+        shape = MaterialTheme.shapes.large,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                IconBadge(
+                    icon = if (done) Ic.CheckCircle else icon,
+                    bg = if (done) ok.copy(alpha = 0.14f) else cs.primaryContainer,
+                    fg = if (done) ok else cs.onPrimaryContainer,
+                )
+                Column {
+                    Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    if (subtitle != null) {
+                        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+                    }
+                }
+            }
+            content()
+        }
+    }
+}
+
+@Composable
+private fun SectionCard(
+    icon: ImageVector,
+    title: String,
+    subtitle: String?,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
@@ -123,32 +292,16 @@ private fun StepCard(
         shape = MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Box(
-                    Modifier
-                        .size(28.dp)
-                        .background(if (done) successColor() else cs.primaryContainer, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        if (done) "✓" else "$number",
-                        color = if (done) Color.White else cs.onPrimaryContainer,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
+                IconBadge(icon, cs.primaryContainer, cs.onPrimaryContainer)
                 Column {
                     Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     if (subtitle != null) {
-                        Text(
-                            subtitle,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = cs.onSurfaceVariant,
-                        )
+                        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
                     }
                 }
             }
@@ -166,6 +319,7 @@ private fun Field(
     password: Boolean = false,
     visible: Boolean = true,
     hint: String? = null,
+    leading: ImageVector? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val cs = MaterialTheme.colorScheme
@@ -185,6 +339,9 @@ private fun Field(
             disabledContainerColor = cs.background,
         ),
         visualTransformation = if (password && !visible) PasswordVisualTransformation() else VisualTransformation.None,
+        leadingIcon = if (leading != null) {
+            { Icon(leading, contentDescription = null) }
+        } else null,
         trailingIcon = trailing,
         supportingText = if (hint != null) {
             { Text(hint) }
@@ -214,7 +371,7 @@ private fun SwitchRow(title: String, subtitle: String?, checked: Boolean, enable
 }
 
 @Composable
-private fun RowScope.Stat(label: String, value: String) {
+private fun androidx.compose.foundation.layout.RowScope.Stat(label: String, value: String) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = MaterialTheme.shapes.medium,
@@ -231,6 +388,14 @@ private fun RowScope.Stat(label: String, value: String) {
 private fun Terminal(prompt: String, lines: List<String>) {
     Surface(color = TermBg, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Box(Modifier.size(9.dp).background(Color(0xFFFF5F57), CircleShape))
+                Box(Modifier.size(9.dp).background(Color(0xFFFEBC2E), CircleShape))
+                Box(Modifier.size(9.dp).background(Color(0xFF28C840), CircleShape))
+                Spacer(Modifier.width(6.dp))
+                Text("টার্মিনাল", color = TermDim, fontSize = 11.sp)
+            }
+            Spacer(Modifier.height(4.dp))
             Text(prompt, color = TermDim, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
             lines.takeLast(150).forEach { l ->
                 val (mark, color) = when {
@@ -253,30 +418,9 @@ private fun Terminal(prompt: String, lines: List<String>) {
     }
 }
 
-// ───────────────────────── মূল স্ক্রিন ─────────────────────────
+// ───────────────────────── বিল্ড ও APK ট্যাব ─────────────────────────
 
 private class ConfirmAction(val title: String, val text: String, val onYes: () -> Unit)
-
-@Composable
-private fun SectionCard(title: String, subtitle: String?, content: @Composable ColumnScope.() -> Unit) {
-    val cs = MaterialTheme.colorScheme
-    Card(
-        colors = CardDefaults.cardColors(containerColor = cs.surface),
-        border = BorderStroke(1.dp, cs.outline),
-        shape = MaterialTheme.shapes.large,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                if (subtitle != null) {
-                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
-                }
-            }
-            content()
-        }
-    }
-}
 
 private fun installApk(ctx: Context, file: File) {
     if (Build.VERSION.SDK_INT >= 26 && !ctx.packageManager.canRequestPackageInstalls()) {
@@ -301,14 +445,15 @@ private fun BuildsTab(vm: MainViewModel) {
     var confirm by remember { mutableStateOf<ConfirmAction?>(null) }
     val repoLabel = vm.parseRepo(vm.repoInput)?.let { "${it.first}/${it.second}" }
     val busy = vm.busyRunId != null
+    val dangerColors = ButtonDefaults.textButtonColors(contentColor = cs.error)
 
-    SectionCard("বিল্ড (GitHub Actions)", repoLabel ?: "আপলোড ট্যাবের ধাপ ২-এ রিপো দিন") {
+    SectionCard(Ic.Build, "বিল্ড (GitHub Actions)", repoLabel ?: "আপলোড ট্যাবের ধাপ ২-এ রিপো দিন") {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
                 onClick = { vm.refreshRuns() },
                 enabled = !vm.loadingRuns && !busy,
                 shape = MaterialTheme.shapes.medium,
-            ) { Text(if (vm.loadingRuns) "আনা হচ্ছে…" else "রিফ্রেশ") }
+            ) { BtnLabel(Ic.Refresh, if (vm.loadingRuns) "আনা হচ্ছে…" else "রিফ্রেশ") }
 
             val old = vm.runs.count { it.status == "completed" } - 3
             if (old > 0) {
@@ -321,47 +466,55 @@ private fun BuildsTab(vm: MainViewModel) {
                     },
                     enabled = !busy,
                     shape = MaterialTheme.shapes.medium,
-                ) { Text("পুরনো পরিষ্কার ($old)") }
+                ) { BtnLabel(Ic.DeleteSweep, "পুরনো পরিষ্কার ($old)") }
             }
         }
 
-        vm.runsError?.let { Text(it, color = cs.error, style = MaterialTheme.typography.bodySmall) }
+        vm.runsError?.let {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(Ic.Warning, contentDescription = null, tint = cs.error, modifier = Modifier.size(16.dp))
+                Text(it, color = cs.error, style = MaterialTheme.typography.bodySmall)
+            }
+        }
         if (vm.runs.isEmpty() && !vm.loadingRuns && vm.runsError == null) {
             Text("কোনো বিল্ড পাওয়া যায়নি", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
         }
 
         vm.runs.take(10).forEach { r ->
-            val (label, color) = when {
-                r.status != "completed" ->
-                    (if (r.status == "queued") "অপেক্ষায়" else "চলছে") to cs.primary
-                r.conclusion == "success" -> "সফল" to ok
-                r.conclusion == "cancelled" -> "বাতিল" to cs.onSurfaceVariant
-                else -> "ব্যর্থ" to cs.error
+            val running = r.status != "completed"
+            val (label, color, runIcon) = when {
+                running -> Triple(if (r.status == "queued") "অপেক্ষায়" else "চলছে", cs.primary, Ic.Refresh)
+                r.conclusion == "success" -> Triple("সফল", ok, Ic.CheckCircle)
+                r.conclusion == "cancelled" -> Triple("বাতিল", cs.onSurfaceVariant, Ic.Close)
+                else -> Triple("ব্যর্থ", cs.error, Ic.Warning)
             }
             Surface(
                 color = cs.surfaceVariant,
                 shape = MaterialTheme.shapes.medium,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        Text(
-                            r.title,
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 2,
-                        )
+                        IconBadge(runIcon, color.copy(alpha = 0.14f), color, size = 36.dp)
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                r.title,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                "#${r.number}  ·  ${r.branch}  ·  ${timeAgo(r.createdAt)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = cs.onSurfaceVariant,
+                            )
+                        }
                         Pill(label, color)
                     }
-                    Text(
-                        "#${r.number}  ·  ${r.branch}  ·  ${timeAgo(r.createdAt)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = cs.onSurfaceVariant,
-                    )
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -374,14 +527,14 @@ private fun BuildsTab(vm: MainViewModel) {
                                     onClick = { vm.downloadApk(r) { f -> installApk(ctx, f) } },
                                     enabled = !busy,
                                     shape = MaterialTheme.shapes.medium,
-                                ) { Text("APK নামান ও ইনস্টল") }
+                                ) { BtnLabel(Ic.Download, "APK নামান ও ইনস্টল") }
                             }
                             if (r.status == "completed" && r.conclusion != "success") {
                                 OutlinedButton(
                                     onClick = { vm.rerun(r) },
                                     enabled = !busy,
                                     shape = MaterialTheme.shapes.medium,
-                                ) { Text("আবার চালান") }
+                                ) { BtnLabel(Ic.Replay, "আবার চালান") }
                             }
                             if (r.status == "completed") {
                                 TextButton(
@@ -392,7 +545,8 @@ private fun BuildsTab(vm: MainViewModel) {
                                         ) { vm.deleteRun(r) }
                                     },
                                     enabled = !busy,
-                                ) { Text("মুছুন", color = cs.error) }
+                                    colors = dangerColors,
+                                ) { BtnLabel(Ic.Delete, "মুছুন") }
                             }
                         }
                     }
@@ -401,7 +555,7 @@ private fun BuildsTab(vm: MainViewModel) {
         }
     }
 
-    SectionCard("ডাউনলোড করা APK", "ফোনে সংরক্ষিত — ইনস্টল বা মুছে ফেলুন") {
+    SectionCard(Ic.SystemUpdate, "ডাউনলোড করা APK", "ফোনে সংরক্ষিত — ইনস্টল বা মুছে ফেলুন") {
         if (vm.apkFiles.isEmpty()) {
             Text("কোনো APK নেই", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
         }
@@ -411,25 +565,38 @@ private fun BuildsTab(vm: MainViewModel) {
                 shape = MaterialTheme.shapes.medium,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Row(
-                    Modifier.padding(start = 14.dp, top = 8.dp, bottom = 8.dp, end = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(f.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
-                        Text(
-                            humanSize(f.length()),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = cs.onSurfaceVariant,
-                        )
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        IconBadge(Ic.SystemUpdate, cs.primaryContainer, cs.onPrimaryContainer, size = 36.dp)
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                f.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                humanSize(f.length()),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = cs.onSurfaceVariant,
+                            )
+                        }
                     }
-                    TextButton(onClick = { installApk(ctx, f) }) { Text("ইনস্টল") }
-                    TextButton(
-                        onClick = {
-                            confirm = ConfirmAction("APK মুছবেন?", "${f.name} ফোন থেকে মুছে যাবে।") { vm.deleteApk(f) }
-                        },
-                    ) { Text("মুছুন", color = cs.error) }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { installApk(ctx, f) },
+                            shape = MaterialTheme.shapes.medium,
+                        ) { BtnLabel(Ic.SystemUpdate, "ইনস্টল") }
+                        TextButton(
+                            onClick = {
+                                confirm = ConfirmAction("APK মুছবেন?", "${f.name} ফোন থেকে মুছে যাবে।") { vm.deleteApk(f) }
+                            },
+                            colors = dangerColors,
+                        ) { BtnLabel(Ic.Delete, "মুছুন") }
+                    }
                 }
             }
         }
@@ -442,16 +609,25 @@ private fun BuildsTab(vm: MainViewModel) {
                     ) { vm.deleteAllApks() }
                 },
                 shape = MaterialTheme.shapes.medium,
-            ) { Text("সব মুছুন") }
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = cs.error),
+            ) { BtnLabel(Ic.DeleteSweep, "সব APK মুছুন") }
         }
     }
 
     vm.buildMsg?.let {
-        Text(
-            it,
-            color = if (vm.buildMsgError) cs.error else ok,
-            style = MaterialTheme.typography.bodyMedium,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(
+                if (vm.buildMsgError) Ic.Warning else Ic.CheckCircle,
+                contentDescription = null,
+                tint = if (vm.buildMsgError) cs.error else ok,
+                modifier = Modifier.size(18.dp),
+            )
+            Text(
+                it,
+                color = if (vm.buildMsgError) cs.error else ok,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
     }
     Text(
         "টোকেনে Actions অনুমতি লাগবে: Classic → repo  ·  Fine-grained → Actions: Read and write",
@@ -462,23 +638,28 @@ private fun BuildsTab(vm: MainViewModel) {
     confirm?.let { c ->
         AlertDialog(
             onDismissRequest = { confirm = null },
+            icon = { Icon(Ic.Delete, contentDescription = null, tint = cs.error) },
             title = { Text(c.title) },
             text = { Text(c.text) },
             confirmButton = {
-                TextButton(onClick = {
-                    c.onYes()
-                    confirm = null
-                }) { Text("হ্যাঁ, মুছুন", color = cs.error) }
+                TextButton(
+                    onClick = {
+                        c.onYes()
+                        confirm = null
+                    },
+                    colors = dangerColors,
+                ) { Text("হ্যাঁ, মুছুন") }
             },
             dismissButton = { TextButton(onClick = { confirm = null }) { Text("না") } },
         )
     }
 }
 
+// ───────────────────────── রিপো বাছাইয়ের পপআপ ─────────────────────────
+
 @Composable
 private fun RepoPicker(vm: MainViewModel, onDismiss: () -> Unit) {
     val cs = MaterialTheme.colorScheme
-    val ok = successColor()
     var query by remember { mutableStateOf("") }
     val list = vm.repos.filter { it.fullName.contains(query.trim(), ignoreCase = true) }
 
@@ -489,7 +670,7 @@ private fun RepoPicker(vm: MainViewModel, onDismiss: () -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .heightIn(max = 560.dp),
+                .heightIn(max = 600.dp),
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(
@@ -497,24 +678,31 @@ private fun RepoPicker(vm: MainViewModel, onDismiss: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text("রিপো বাছাই করুন", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        IconBadge(Ic.Book, cs.primaryContainer, cs.onPrimaryContainer, size = 36.dp)
+                        Text("রিপো বাছাই করুন", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    }
                     Row {
-                        TextButton(onClick = { vm.loadRepos(force = true) }, enabled = !vm.loadingRepos) { Text("রিফ্রেশ") }
-                        TextButton(onClick = onDismiss) { Text("বন্ধ") }
+                        IconButton(onClick = { vm.loadRepos(force = true) }, enabled = !vm.loadingRepos) {
+                            Icon(Ic.Refresh, contentDescription = "রিফ্রেশ")
+                        }
+                        IconButton(onClick = onDismiss) { Icon(Ic.Close, contentDescription = "বন্ধ") }
                     }
                 }
-                Field("রিপো খুঁজুন", query, { query = it })
+                Field("রিপো খুঁজুন", query, { query = it }, leading = Ic.Search)
                 when {
                     vm.loadingRepos -> Text(
                         "তালিকা আনা হচ্ছে…",
                         style = MaterialTheme.typography.bodyMedium,
                         color = cs.onSurfaceVariant,
                     )
-                    vm.reposError != null -> Text(
-                        vm.reposError ?: "",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = cs.error,
-                    )
+                    vm.reposError != null -> Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(Ic.Warning, contentDescription = null, tint = cs.error, modifier = Modifier.size(18.dp))
+                        Text(vm.reposError ?: "", style = MaterialTheme.typography.bodyMedium, color = cs.error)
+                    }
                     list.isEmpty() -> Text(
                         if (vm.repos.isEmpty()) "এই টোকেনে push করার মতো কোনো রিপো পাওয়া যায়নি" else "কিছু মেলেনি",
                         style = MaterialTheme.typography.bodyMedium,
@@ -531,23 +719,32 @@ private fun RepoPicker(vm: MainViewModel, onDismiss: () -> Unit) {
                                 Row(
                                     Modifier
                                         .fillMaxWidth()
+                                        .clip(MaterialTheme.shapes.medium)
                                         .clickable {
                                             vm.pickRepo(r)
                                             onDismiss()
                                         }
-                                        .padding(vertical = 12.dp),
+                                        .padding(vertical = 10.dp, horizontal = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 ) {
+                                    IconBadge(Ic.Book, cs.surfaceVariant, cs.onSurfaceVariant, size = 36.dp)
                                     Column(Modifier.weight(1f)) {
-                                        Text(r.fullName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                                        Text(
+                                            r.fullName,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            fontWeight = FontWeight.Medium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
                                         Text(
                                             "ডিফল্ট ব্রাঞ্চ: ${r.defaultBranch}",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = cs.onSurfaceVariant,
                                         )
                                     }
-                                    if (r.isPrivate) Pill("private", cs.onSurfaceVariant) else Pill("public", ok)
+                                    if (r.isPrivate) Pill("private", cs.onSurfaceVariant, Ic.Lock)
+                                    else Pill("public", successColor())
                                 }
                             }
                         }
@@ -558,12 +755,15 @@ private fun RepoPicker(vm: MainViewModel, onDismiss: () -> Unit) {
     }
 }
 
+// ───────────────────────── মূল স্ক্রিন ─────────────────────────
+
 @Composable
 private fun Screen(vm: MainViewModel = viewModel()) {
     val ctx = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val cs = MaterialTheme.colorScheme
     val ok = successColor()
+    val dangerColors = ButtonDefaults.textButtonColors(contentColor = cs.error)
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) vm.onFolderPicked(uri)
@@ -582,32 +782,11 @@ private fun Screen(vm: MainViewModel = viewModel()) {
                 .systemBarsPadding()
                 .imePadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // হেডার
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "Git Folder Uploader",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        "পুরো ফোল্ডার, এক কমিটে GitHub-এ",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = cs.onSurfaceVariant,
-                    )
-                }
-                val acc = vm.account
-                if (acc != null) Pill("@$acc", ok) else Pill("সংযুক্ত নয়", cs.onSurfaceVariant)
-            }
+            Hero(vm.account)
 
-            // ট্যাব: আপলোড | বিল্ড ও APK
             var tab by remember { mutableStateOf(0) }
             val hasActive = vm.runs.any { it.status != "completed" }
             LaunchedEffect(tab) {
@@ -625,20 +804,14 @@ private fun Screen(vm: MainViewModel = viewModel()) {
                     }
                 }
             }
-            TabRow(
-                selectedTabIndex = tab,
-                containerColor = cs.background,
-                contentColor = cs.primary,
-            ) {
-                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("আপলোড") })
-                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("বিল্ড ও APK") })
-            }
+            SegmentedTabs(tab) { tab = it }
 
             // লগআউট / সেভ করা তথ্য মোছার নিশ্চিতকরণ (১ = লগআউট, ২ = সব মুছুন)
             var logoutMode by remember { mutableStateOf(0) }
             if (logoutMode != 0) {
                 AlertDialog(
                     onDismissRequest = { logoutMode = 0 },
+                    icon = { Icon(Ic.Logout, contentDescription = null, tint = cs.error) },
                     title = { Text(if (logoutMode == 1) "লগআউট করবেন?" else "সব সেভ করা তথ্য মুছবেন?") },
                     text = {
                         Text(
@@ -650,252 +823,314 @@ private fun Screen(vm: MainViewModel = viewModel()) {
                         )
                     },
                     confirmButton = {
-                        TextButton(onClick = {
-                            vm.logout(clearAll = logoutMode == 2)
-                            logoutMode = 0
-                        }) { Text("হ্যাঁ, মুছুন", color = cs.error) }
+                        TextButton(
+                            onClick = {
+                                vm.logout(clearAll = logoutMode == 2)
+                                logoutMode = 0
+                            },
+                            colors = dangerColors,
+                        ) { Text("হ্যাঁ, মুছুন") }
                     },
                     dismissButton = { TextButton(onClick = { logoutMode = 0 }) { Text("না") } },
                 )
             }
 
             if (tab == 0) {
-            // ধাপ ১ — অ্যাকাউন্ট
-            StepCard(1, "অ্যাকাউন্ট", "GitHub Personal Access Token", vm.account != null) {
-                var visible by remember { mutableStateOf(false) }
-                Field(
-                    "Access Token", vm.token, vm::onTokenChange,
-                    enabled = !vm.running, password = true, visible = visible,
-                    trailing = {
-                        TextButton(onClick = { visible = !visible }) { Text(if (visible) "লুকান" else "দেখুন") }
-                    },
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    OutlinedButton(
-                        onClick = vm::verifyToken,
-                        enabled = vm.token.isNotBlank() && !vm.verifying && !vm.running,
-                        shape = MaterialTheme.shapes.medium,
-                    ) { Text("যাচাই করুন") }
-                    when {
-                        vm.verifying -> Text("যাচাই হচ্ছে…", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
-                        vm.account != null -> Text(
-                            "@${vm.account} হিসেবে সংযুক্ত",
-                            color = ok,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Medium,
-                        )
-                        vm.tokenError != null -> Text(
-                            vm.tokenError ?: "",
-                            color = cs.error,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = vm.rememberToken, onCheckedChange = { vm.rememberToken = it }, enabled = !vm.running)
-                    Text("টোকেন এনক্রিপ্ট করে মনে রাখো", style = MaterialTheme.typography.bodyMedium)
-                }
-                SwitchRow(
-                    "আপলোড শেষে নিজে লগআউট",
-                    "সফল push-এর পর টোকেন ফোন থেকে মুছে যাবে",
-                    vm.clearAfterPush, !vm.running,
-                ) { vm.clearAfterPush = it }
-                if (vm.token.isNotBlank()) {
-                    TextButton(onClick = { logoutMode = 1 }, enabled = !vm.running) {
-                        Text("লগআউট (টোকেন মুছুন)", color = cs.error)
-                    }
-                }
-                Text(
-                    "Classic: repo (প্রয়োজনে workflow)   ·   Fine-grained: Contents → Read and write",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = cs.onSurfaceVariant,
-                )
-            }
-
-            // ধাপ ২ — রিপোজিটরি
-            StepCard(
-                2, "রিপোজিটরি", "কোথায় push হবে",
-                vm.parseRepo(vm.repoInput) != null && vm.branch.isNotBlank(),
-            ) {
-                var showPicker by remember { mutableStateOf(false) }
-                FilledTonalButton(
-                    onClick = {
-                        showPicker = true
-                        vm.loadRepos()
-                    },
-                    enabled = vm.token.isNotBlank() && !vm.running,
-                    shape = MaterialTheme.shapes.medium,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                ) {
-                    Text(
-                        if (vm.token.isBlank()) "রিপো বাছাই (আগে টোকেন দিন)" else "আমার রিপোগুলো থেকে বাছাই করুন",
-                        fontWeight = FontWeight.Medium,
-                    )
-                }
-                Field(
-                    "রিপো (owner/repo বা লিংক)", vm.repoInput, { vm.repoInput = it },
-                    enabled = !vm.running, hint = "তালিকা থেকে বাছাই করুন, অথবা নতুন রিপোর নাম হাতে লিখুন",
-                )
-                if (showPicker) RepoPicker(vm) { showPicker = false }
-                Field("ব্রাঞ্চ", vm.branch, { vm.branch = it }, enabled = !vm.running)
-                Field("কমিট মেসেজ", vm.message, { vm.message = it }, enabled = !vm.running)
-                SwitchRow(
-                    "রিপো না থাকলে বানাও",
-                    "টোকেনে রিপো তৈরির অনুমতি লাগবে (Classic: repo)",
-                    vm.createRepo, !vm.running,
-                ) { vm.createRepo = it }
-                if (vm.createRepo) {
-                    SwitchRow("প্রাইভেট রিপো", null, vm.privateRepo, !vm.running) { vm.privateRepo = it }
-                }
-            }
-
-            // ধাপ ৩ — ফোল্ডার
-            StepCard(3, "ফোল্ডার", "যে প্রজেক্ট আপলোড করবেন", vm.folderUri != null) {
-                var showPreview by remember { mutableStateOf(false) }
-                var advanced by remember { mutableStateOf(false) }
-
-                FilledTonalButton(
-                    onClick = { picker.launch(null) },
-                    enabled = !vm.running,
-                    shape = MaterialTheme.shapes.medium,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
-                ) {
-                    Text(
-                        if (vm.folderName.isEmpty()) "ফোল্ডার বাছাই করুন" else "${vm.folderName}  ·  বদলান",
-                        fontWeight = FontWeight.Medium,
-                    )
-                }
-
-                if (vm.scanning) {
-                    Text("স্ক্যান হচ্ছে…", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
-                }
-                vm.scanInfo?.let { info ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Stat("ফাইল", "${info.count}")
-                        Stat("মোট সাইজ", humanSize(info.bytes))
-                        Stat("বাদ (বড়)", "${info.skipped.size}")
-                    }
-                    TextButton(onClick = { showPreview = !showPreview }) {
-                        Text(if (showPreview) "▾  ফাইলের তালিকা লুকান" else "▸  ফাইলের তালিকা দেখুন")
-                    }
-                    if (showPreview) {
-                        Surface(color = TermBg, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                info.preview.forEach {
-                                    Text("+ $it", color = TermOk, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
-                                }
-                                if (info.count > info.preview.size) {
-                                    Text(
-                                        "… আরও ${info.count - info.preview.size} টি ফাইল",
-                                        color = TermDim, fontFamily = FontFamily.Monospace, fontSize = 12.sp,
-                                    )
-                                }
-                                info.skipped.forEach {
-                                    Text("! $it", color = TermWarn, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
-                                }
+                // ধাপ ১ — অ্যাকাউন্ট
+                StepCard(Ic.Key, "১. অ্যাকাউন্ট", "GitHub Access Token দিয়ে সংযুক্ত হন", vm.account != null) {
+                    var visible by remember { mutableStateOf(false) }
+                    Field(
+                        "Access Token", vm.token, vm::onTokenChange,
+                        enabled = !vm.running, password = true, visible = visible, leading = Ic.Key,
+                        trailing = {
+                            IconButton(onClick = { visible = !visible }) {
+                                Icon(
+                                    if (visible) Ic.VisibilityOff else Ic.Visibility,
+                                    contentDescription = if (visible) "লুকান" else "দেখুন",
+                                )
                             }
+                        },
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        OutlinedButton(
+                            onClick = vm::verifyToken,
+                            enabled = vm.token.isNotBlank() && !vm.verifying && !vm.running,
+                            shape = MaterialTheme.shapes.medium,
+                        ) { BtnLabel(Ic.Check, "যাচাই করুন") }
+                        when {
+                            vm.verifying -> Text(
+                                "যাচাই হচ্ছে…",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = cs.onSurfaceVariant,
+                            )
+                            vm.account != null -> Text(
+                                "@${vm.account} সংযুক্ত",
+                                color = ok,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Medium,
+                            )
+                            vm.tokenError != null -> Text(
+                                vm.tokenError ?: "",
+                                modifier = Modifier.weight(1f),
+                                color = cs.error,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
                         }
                     }
-                }
-
-                TextButton(onClick = { advanced = !advanced }) {
-                    Text(if (advanced) "▾  অ্যাডভান্সড" else "▸  অ্যাডভান্সড")
-                }
-                if (advanced) {
-                    Field(
-                        "রিপোর ভেতরের সাবফোল্ডার (ঐচ্ছিক)", vm.subDir, { vm.subDir = it },
-                        enabled = !vm.running, hint = "ফাঁকা রাখলে রিপোর রুটে যাবে",
-                    )
-                    Field(
-                        "বাদ দেওয়া নাম (কমা দিয়ে)", vm.excludes, { vm.excludes = it },
-                        enabled = !vm.running, hint = "*.apk এর মতো এক্সটেনশনও দেওয়া যায়",
-                    )
-                    OutlinedButton(
-                        onClick = vm::scanFolder,
-                        enabled = vm.folderUri != null && !vm.scanning && !vm.running,
-                        shape = MaterialTheme.shapes.medium,
-                    ) { Text("আবার স্ক্যান") }
-                }
-
-                Text(
-                    "Download বা স্টোরেজের মূল ফোল্ডার বাছাই করা যায় না। তার ভেতরের প্রজেক্ট ফোল্ডারটি বাছাই করুন।",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = cs.onSurfaceVariant,
-                )
-            }
-
-            // ধাপ ৪ — Push
-            StepCard(4, "Push", "এক কমিটে সব ফাইল", vm.resultUrl != null) {
-                if (vm.running) {
-                    OutlinedButton(
-                        onClick = vm::cancel,
-                        shape = MaterialTheme.shapes.medium,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                    ) { Text("বাতিল করুন") }
-                } else {
-                    Button(
-                        onClick = vm::start,
-                        enabled = vm.ready,
-                        shape = MaterialTheme.shapes.medium,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                    ) { Text("Push to GitHub", fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
-                    if (!vm.ready) {
-                        Text(
-                            "টোকেন, রিপো ও ফোল্ডার দিলে বাটন চালু হবে",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = cs.onSurfaceVariant,
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = vm.rememberToken, onCheckedChange = { vm.rememberToken = it }, enabled = !vm.running)
+                        Text("টোকেন এনক্রিপ্ট করে মনে রাখো", style = MaterialTheme.typography.bodyMedium)
                     }
-                }
-
-                if (vm.running || vm.total > 0) {
-                    val pct = if (vm.total == 0) 0 else vm.done * 100 / vm.total
-                    LinearProgressIndicator(
-                        progress = { if (vm.total == 0) 0f else vm.done.toFloat() / vm.total },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(50)),
-                        color = cs.primary,
-                        trackColor = cs.surfaceVariant,
-                    )
+                    SwitchRow(
+                        "আপলোড শেষে নিজে লগআউট",
+                        "সফল push-এর পর টোকেন ফোন থেকে মুছে যাবে",
+                        vm.clearAfterPush, !vm.running,
+                    ) { vm.clearAfterPush = it }
+                    if (vm.token.isNotBlank()) {
+                        TextButton(onClick = { logoutMode = 1 }, enabled = !vm.running, colors = dangerColors) {
+                            BtnLabel(Ic.Logout, "লগআউট (টোকেন মুছুন)")
+                        }
+                    }
                     Text(
-                        "${vm.done} / ${vm.total} ফাইল  ·  $pct%",
+                        "Classic: repo (প্রয়োজনে workflow)   ·   Fine-grained: Contents → Read and write",
                         style = MaterialTheme.typography.bodySmall,
                         color = cs.onSurfaceVariant,
                     )
                 }
 
-                if (vm.logs.isNotEmpty()) {
-                    Terminal("$ git push origin ${vm.branch}", vm.logs)
-                }
-
-                vm.resultUrl?.let { url ->
+                // ধাপ ২ — রিপোজিটরি
+                StepCard(
+                    Ic.Book, "২. রিপোজিটরি", "কোথায় push হবে",
+                    vm.parseRepo(vm.repoInput) != null && vm.branch.isNotBlank(),
+                ) {
+                    var showPicker by remember { mutableStateOf(false) }
                     FilledTonalButton(
-                        onClick = { uriHandler.openUri(url) },
+                        onClick = {
+                            showPicker = true
+                            vm.loadRepos()
+                        },
+                        enabled = vm.token.isNotBlank() && !vm.running,
                         shape = MaterialTheme.shapes.medium,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp),
-                    ) { Text("GitHub-এ দেখুন") }
+                            .height(50.dp),
+                    ) {
+                        BtnLabel(
+                            Ic.Search,
+                            if (vm.token.isBlank()) "আগে টোকেন দিন" else "আমার রিপোগুলো থেকে বাছাই করুন",
+                            FontWeight.Medium,
+                        )
+                    }
+                    Field(
+                        "রিপো (owner/repo বা লিংক)", vm.repoInput, { vm.repoInput = it },
+                        enabled = !vm.running, leading = Ic.Book,
+                        hint = "তালিকা থেকে বাছাই করুন, অথবা নতুন রিপোর নাম হাতে লিখুন",
+                    )
+                    Field("ব্রাঞ্চ", vm.branch, { vm.branch = it }, enabled = !vm.running)
+                    Field("কমিট মেসেজ", vm.message, { vm.message = it }, enabled = !vm.running)
+                    SwitchRow(
+                        "রিপো না থাকলে বানাও",
+                        "টোকেনে রিপো তৈরির অনুমতি লাগবে (Classic: repo)",
+                        vm.createRepo, !vm.running,
+                    ) { vm.createRepo = it }
+                    if (vm.createRepo) {
+                        SwitchRow("প্রাইভেট রিপো", null, vm.privateRepo, !vm.running) { vm.privateRepo = it }
+                    }
+                    if (showPicker) RepoPicker(vm) { showPicker = false }
                 }
-            }
-            TextButton(
-                onClick = { logoutMode = 2 },
-                enabled = !vm.running,
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("সব সেভ করা তথ্য মুছুন", color = cs.error) }
+
+                // ধাপ ৩ — ফোল্ডার
+                StepCard(Ic.Folder, "৩. ফোল্ডার", "যে প্রজেক্ট আপলোড করবেন", vm.folderUri != null) {
+                    var showPreview by remember { mutableStateOf(false) }
+                    var advanced by remember { mutableStateOf(false) }
+
+                    FilledTonalButton(
+                        onClick = { picker.launch(null) },
+                        enabled = !vm.running,
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                    ) {
+                        BtnLabel(
+                            Ic.Folder,
+                            if (vm.folderName.isEmpty()) "ফোল্ডার বাছাই করুন" else "${vm.folderName}  ·  বদলান",
+                            FontWeight.Medium,
+                        )
+                    }
+
+                    if (vm.scanning) {
+                        Text("স্ক্যান হচ্ছে…", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+                    }
+                    vm.scanInfo?.let { info ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Stat("ফাইল", "${info.count}")
+                            Stat("মোট সাইজ", humanSize(info.bytes))
+                            Stat("বাদ (বড়)", "${info.skipped.size}")
+                        }
+                        TextButton(onClick = { showPreview = !showPreview }) {
+                            BtnLabel(
+                                if (showPreview) Ic.ExpandLess else Ic.ExpandMore,
+                                if (showPreview) "ফাইলের তালিকা লুকান" else "ফাইলের তালিকা দেখুন",
+                            )
+                        }
+                        if (showPreview) {
+                            Surface(color = TermBg, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
+                                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    info.preview.forEach {
+                                        Text("+ $it", color = TermOk, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                                    }
+                                    if (info.count > info.preview.size) {
+                                        Text(
+                                            "… আরও ${info.count - info.preview.size} টি ফাইল",
+                                            color = TermDim, fontFamily = FontFamily.Monospace, fontSize = 12.sp,
+                                        )
+                                    }
+                                    info.skipped.forEach {
+                                        Text("! $it", color = TermWarn, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    TextButton(onClick = { advanced = !advanced }) {
+                        BtnLabel(Ic.Settings, "অ্যাডভান্সড সেটিংস")
+                        Spacer(Modifier.width(4.dp))
+                        Icon(
+                            if (advanced) Ic.ExpandLess else Ic.ExpandMore,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    if (advanced) {
+                        Field(
+                            "রিপোর ভেতরের সাবফোল্ডার (ঐচ্ছিক)", vm.subDir, { vm.subDir = it },
+                            enabled = !vm.running, hint = "ফাঁকা রাখলে রিপোর রুটে যাবে",
+                        )
+                        Field(
+                            "বাদ দেওয়া নাম (কমা দিয়ে)", vm.excludes, { vm.excludes = it },
+                            enabled = !vm.running, hint = "*.apk এর মতো এক্সটেনশনও দেওয়া যায়",
+                        )
+                        OutlinedButton(
+                            onClick = vm::scanFolder,
+                            enabled = vm.folderUri != null && !vm.scanning && !vm.running,
+                            shape = MaterialTheme.shapes.medium,
+                        ) { BtnLabel(Ic.Refresh, "আবার স্ক্যান") }
+                    }
+
+                    Text(
+                        "Download বা স্টোরেজের মূল ফোল্ডার বাছাই করা যায় না। তার ভেতরের প্রজেক্ট ফোল্ডারটি বাছাই করুন।",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = cs.onSurfaceVariant,
+                    )
+                }
+
+                // ধাপ ৪ — Push
+                StepCard(Ic.CloudUpload, "৪. Push", "এক কমিটে সব ফাইল", vm.resultUrl != null) {
+                    if (vm.running) {
+                        OutlinedButton(
+                            onClick = vm::cancel,
+                            shape = MaterialTheme.shapes.medium,
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = cs.error),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(54.dp),
+                        ) { BtnLabel(Ic.Close, "বাতিল করুন") }
+                    } else {
+                        Button(
+                            onClick = vm::start,
+                            enabled = vm.ready,
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp),
+                        ) { BtnLabel(Ic.CloudUpload, "Push to GitHub", FontWeight.SemiBold) }
+                        if (!vm.ready) {
+                            Text(
+                                "টোকেন, রিপো ও ফোল্ডার দিলে বাটন চালু হবে",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = cs.onSurfaceVariant,
+                            )
+                        }
+                    }
+
+                    if (vm.running || vm.total > 0) {
+                        val pct = if (vm.total == 0) 0 else vm.done * 100 / vm.total
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                "${vm.done} / ${vm.total} ফাইল",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = cs.onSurfaceVariant,
+                            )
+                            Text(
+                                "$pct%",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = cs.primary,
+                            )
+                        }
+                        LinearProgressIndicator(
+                            progress = { if (vm.total == 0) 0f else vm.done.toFloat() / vm.total },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(50)),
+                            color = cs.primary,
+                            trackColor = cs.surfaceVariant,
+                        )
+                    }
+
+                    if (vm.logs.isNotEmpty()) {
+                        Terminal("$ git push origin ${vm.branch}", vm.logs)
+                    }
+
+                    vm.resultUrl?.let { url ->
+                        Surface(
+                            color = ok.copy(alpha = 0.12f),
+                            shape = MaterialTheme.shapes.medium,
+                            border = BorderStroke(1.dp, ok.copy(alpha = 0.35f)),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Row(
+                                Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Icon(Ic.CheckCircle, contentDescription = null, tint = ok, modifier = Modifier.size(26.dp))
+                                Column {
+                                    Text("কাজ শেষ!", fontWeight = FontWeight.SemiBold, color = ok)
+                                    Text(
+                                        "এখন GitHub-এ গিয়ে দেখে নিতে পারেন",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = cs.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                        FilledTonalButton(
+                            onClick = { uriHandler.openUri(url) },
+                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                        ) { BtnLabel(Ic.OpenInNew, "GitHub-এ দেখুন") }
+                    }
+                }
+
+                TextButton(
+                    onClick = { logoutMode = 2 },
+                    enabled = !vm.running,
+                    colors = dangerColors,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { BtnLabel(Ic.Delete, "সব সেভ করা তথ্য মুছুন") }
             } else {
                 BuildsTab(vm)
             }
