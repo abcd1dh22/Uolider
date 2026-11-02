@@ -14,9 +14,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
@@ -67,13 +65,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var scanInfo by mutableStateOf<ScanInfo?>(null)
 
     // ধাপ ৪: push
-    var running by mutableStateOf(false)
-    var done by mutableStateOf(0)
-    var total by mutableStateOf(0)
-    var resultUrl by mutableStateOf<String?>(null)
-    val logs = mutableStateListOf<String>()
-
-    private var job: Job? = null
+    // আপলোড এখন ফোরগ্রাউন্ড সার্ভিসে চলে; অবস্থা UploadHub-এ থাকে
+    val running: Boolean get() = UploadHub.running
+    val done: Int get() = UploadHub.done
+    val total: Int get() = UploadHub.total
+    var resultUrl: String?
+        get() = UploadHub.resultUrl
+        set(v) { UploadHub.resultUrl = v }
+    val logs get() = UploadHub.logs
 
     private val prefs: SharedPreferences =
         app.getSharedPreferences("settings", Context.MODE_PRIVATE)
@@ -381,52 +380,32 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             logs += "⚠️ টোকেন, রিপো (owner/repo) ও ব্রাঞ্চ ঠিকমতো দিন"
             return
         }
+        if (UploadHub.running) return
         savePrefs()
-        running = true
-        done = 0
-        total = 0
-        resultUrl = null
-        logs.clear()
+        UploadHub.done = 0
+        UploadHub.total = 0
+        UploadHub.resultUrl = null
+        UploadHub.logs.clear()
 
-        job = viewModelScope.launch {
-            try {
-                val app = getApplication<Application>()
-                val root = DocumentFile.fromTreeUri(app, uri)
-                    ?: throw GitHubException("ফোল্ডার খোলা যায়নি, আবার বাছাই করুন")
-                val cfg = UploadConfig(
-                    token = token.trim(),
-                    owner = repoPair.first,
-                    repo = repoPair.second,
-                    branch = branch.trim(),
-                    message = message.ifBlank { "Upload via Git Folder Uploader" },
-                    subDir = subDir.trim(),
-                    excludes = parseExcludes(),
-                    createRepo = createRepo,
-                    privateRepo = privateRepo,
-                )
-                resultUrl = GitHubUploader(
-                    resolver = app.contentResolver,
-                    cfg = cfg,
-                    log = { logs += it },
-                    progress = { d, t -> done = d; total = t },
-                ).run(root)
-            } catch (e: CancellationException) {
-                logs += "⛔ বাতিল করা হয়েছে (যে ফাইলগুলো আপলোড হয়েছে সেগুলো কমিট হয়নি)"
-                throw e
-            } catch (e: Exception) {
-                logs += "❌ ${e.message}"
-            } finally {
-                running = false
-                if (clearAfterPush && resultUrl != null) {
-                    logs += "🔒 টোকেন এই ফোন থেকে মুছে ফেলা হয়েছে (লগআউট)"
-                    logout(clearAll = false)
-                }
-            }
-        }
+        UploadHub.pendingCfg = UploadConfig(
+            token = token.trim(),
+            owner = repoPair.first,
+            repo = repoPair.second,
+            branch = branch.trim(),
+            message = message.ifBlank { "Upload via Git Folder Uploader" },
+            subDir = subDir.trim(),
+            excludes = parseExcludes(),
+            createRepo = createRepo,
+            privateRepo = privateRepo,
+        )
+        UploadHub.pendingUri = uri
+        UploadHub.pendingClearAfter = clearAfterPush
+        UploadHub.running = true
+        UploadService.start(getApplication())
     }
 
     fun cancel() {
-        job?.cancel()
+        UploadService.cancel()
     }
 
     /**
@@ -435,7 +414,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * GitHub-এর অ্যাকাউন্ট বা রিপোতে কিছু বদলায় না।
      */
     fun logout(clearAll: Boolean) {
-        if (running) return
+        if (UploadHub.running) return
         token = ""
         account = null
         tokenError = null
@@ -464,10 +443,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             createRepo = false
             privateRepo = true
             rememberToken = true
-            logs.clear()
-            resultUrl = null
-            done = 0
-            total = 0
+            UploadHub.logs.clear()
+            UploadHub.resultUrl = null
+            UploadHub.done = 0
+            UploadHub.total = 0
             prefs.edit().clear().putBoolean("clearAfterPush", clearAfterPush).apply()
         }
     }

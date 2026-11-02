@@ -3,6 +3,7 @@ package com.example.gitfolderuploader
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -769,6 +770,18 @@ private fun Screen(vm: MainViewModel = viewModel()) {
         if (uri != null) vm.onFolderPicked(uri)
     }
 
+    // নোটিফিকেশনের অনুমতি (Android 13+), তারপর আপলোড শুরু
+    val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        vm.start()
+    }
+    // সফল আপলোডের পর "নিজে লগআউট" চালু থাকলে স্ক্রিনের টোকেনও মুছে ফেলা
+    LaunchedEffect(UploadHub.logoutAfter) {
+        if (UploadHub.logoutAfter) {
+            UploadHub.logoutAfter = false
+            vm.logout(clearAll = false)
+        }
+    }
+
     // push চলার সময় স্ক্রিন জাগিয়ে রাখা
     DisposableEffect(vm.running) {
         val window = (ctx as? Activity)?.window
@@ -1030,7 +1043,7 @@ private fun Screen(vm: MainViewModel = viewModel()) {
                 }
 
                 // ধাপ ৪ — Push
-                StepCard(Ic.CloudUpload, "৪. Push", "এক কমিটে সব ফাইল", vm.resultUrl != null) {
+                StepCard(Ic.CloudUpload, "৪. Push", "এক কমিটে সব ফাইল · অ্যাপ বন্ধ করলেও চলবে", vm.resultUrl != null) {
                     if (vm.running) {
                         OutlinedButton(
                             onClick = vm::cancel,
@@ -1042,7 +1055,16 @@ private fun Screen(vm: MainViewModel = viewModel()) {
                         ) { BtnLabel(Ic.Close, "বাতিল করুন") }
                     } else {
                         Button(
-                            onClick = vm::start,
+                            onClick = {
+                                if (Build.VERSION.SDK_INT >= 33 &&
+                                    ctx.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                                    != PackageManager.PERMISSION_GRANTED
+                                ) {
+                                    notifPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                                } else {
+                                    vm.start()
+                                }
+                            },
                             enabled = vm.ready,
                             shape = RoundedCornerShape(16.dp),
                             modifier = Modifier
