@@ -138,4 +138,12 @@ private val EN_MAP: Map<String, String> = mapOf(
     "ফোনের মতো" to "System",
     "লাইট" to "Light",
     "ডার্ক" to "Dark",
+    "সেটিংস" to "Settings",
+    "ফিরে যান" to "Back",
+    "অ্যাকাউন্ট ও নিরাপত্তা" to "Account & security",
+    "টোকেন সংরক্ষণ ও লগআউটের নিয়ম" to "Token storage and logout rules",
+    "রিপো তৈরি" to "Repo creation",
+    "রিপো না থাকলে কী হবে" to "What if the repo is missing",
+    "ফোল্ডার ও ফিল্টার" to "Folder & filters",
+    "কোন ফাইল যাবে আর কোথায় যাবে" to "Which files go, and where",
 )

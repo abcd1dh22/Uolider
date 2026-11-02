@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -144,7 +145,7 @@ private fun Pill(text: String, color: Color, icon: ImageVector? = null) {
 
 /** উপরের গ্রেডিয়েন্ট হেডার */
 @Composable
-private fun Hero(account: String?) {
+private fun Hero(account: String?, onSettings: () -> Unit) {
     val brush = Brush.linearGradient(
         if (isDark()) listOf(Color(0xFF1E40AF), Color(0xFF4338CA))
         else listOf(Color(0xFF2563EB), Color(0xFF4F46E5))
@@ -158,6 +159,7 @@ private fun Hero(account: String?) {
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
@@ -182,6 +184,13 @@ private fun Hero(account: String?) {
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
+                Spacer(Modifier.weight(1f))
+                IconButton(
+                    onClick = onSettings,
+                    modifier = Modifier.background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(14.dp)),
+                ) {
+                    Icon(Ic.Settings, contentDescription = tr("সেটিংস"), tint = Color.White)
+                }
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -205,6 +214,15 @@ private fun Hero(account: String?) {
                 )
             }
         }
+    }
+}
+
+/** সেটিংস পেজের উপরের বার (পেছনে যাওয়ার বাটনসহ) */
+@Composable
+private fun SettingsTop(onBack: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        IconButton(onClick = onBack) { Icon(Ic.ArrowBack, contentDescription = tr("ফিরে যান")) }
+        Text(tr("সেটিংস"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -821,6 +839,9 @@ private fun Screen(vm: MainViewModel = viewModel()) {
         onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     }
 
+    var page by remember { mutableStateOf(0) }
+    BackHandler(enabled = page == 1) { page = 0 }
+
     Surface(modifier = Modifier.fillMaxSize(), color = cs.background) {
         Column(
             modifier = Modifier
@@ -830,27 +851,6 @@ private fun Screen(vm: MainViewModel = viewModel()) {
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Hero(vm.account)
-
-            var tab by remember { mutableStateOf(0) }
-            val hasActive = vm.runs.any { it.status != "completed" }
-            LaunchedEffect(tab) {
-                if (tab == 1) {
-                    vm.refreshRuns()
-                    vm.loadApkFiles()
-                }
-            }
-            // চলমান বিল্ড থাকলে প্রতি ৮ সেকেন্ডে নিজে থেকে রিফ্রেশ
-            LaunchedEffect(tab, hasActive) {
-                if (tab == 1 && hasActive) {
-                    while (true) {
-                        delay(8000)
-                        vm.refreshRuns(silent = true)
-                    }
-                }
-            }
-            SegmentedTabs(tab) { tab = it }
-
             // লগআউট / সেভ করা তথ্য মোছার নিশ্চিতকরণ (১ = লগআউট, ২ = সব মুছুন)
             var logoutMode by remember { mutableStateOf(0) }
             if (logoutMode != 0) {
@@ -879,6 +879,93 @@ private fun Screen(vm: MainViewModel = viewModel()) {
                     dismissButton = { TextButton(onClick = { logoutMode = 0 }) { Text(tr("না")) } },
                 )
             }
+
+            if (page == 1) {
+                SettingsTop { page = 0 }
+                SectionCard(Ic.Key, tr("অ্যাকাউন্ট ও নিরাপত্তা"), tr("টোকেন সংরক্ষণ ও লগআউটের নিয়ম")) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = vm.rememberToken, onCheckedChange = { vm.rememberToken = it }, enabled = !vm.running)
+                        Text(tr("টোকেন এনক্রিপ্ট করে মনে রাখো"), style = MaterialTheme.typography.bodyMedium)
+                    }
+                    SwitchRow(
+                        tr("আপলোড শেষে নিজে লগআউট"),
+                        tr("সফল push-এর পর টোকেন ফোন থেকে মুছে যাবে"),
+                        vm.clearAfterPush, !vm.running,
+                    ) { vm.clearAfterPush = it }
+                    if (vm.token.isNotBlank()) {
+                        TextButton(onClick = { logoutMode = 1 }, enabled = !vm.running, colors = dangerColors) {
+                            BtnLabel(Ic.Logout, tr("লগআউট (টোকেন মুছুন)"))
+                        }
+                    }
+                }
+                SectionCard(Ic.Book, tr("রিপো তৈরি"), tr("রিপো না থাকলে কী হবে")) {
+                    SwitchRow(
+                        tr("রিপো না থাকলে বানাও"),
+                        tr("টোকেনে রিপো তৈরির অনুমতি লাগবে (Classic: repo)"),
+                        vm.createRepo, !vm.running,
+                    ) { vm.createRepo = it }
+                    if (vm.createRepo) {
+                        SwitchRow(tr("প্রাইভেট রিপো"), null, vm.privateRepo, !vm.running) { vm.privateRepo = it }
+                    }
+                }
+                SectionCard(Ic.Folder, tr("ফোল্ডার ও ফিল্টার"), tr("কোন ফাইল যাবে আর কোথায় যাবে")) {
+                        Field(
+                            tr("রিপোর ভেতরের সাবফোল্ডার (ঐচ্ছিক)"), vm.subDir, { vm.subDir = it },
+                            enabled = !vm.running, hint = tr("ফাঁকা রাখলে রিপোর রুটে যাবে"),
+                        )
+                        Field(
+                            tr("বাদ দেওয়া নাম (কমা দিয়ে)"), vm.excludes, { vm.excludes = it },
+                            enabled = !vm.running, hint = tr("*.apk এর মতো এক্সটেনশনও দেওয়া যায়"),
+                        )
+                        SwitchRow(
+                            tr("workflows ফোল্ডার বাদ দিন"),
+                            tr(".github/workflows আপলোড হবে না (টোকেনে workflow অনুমতি না থাকলে কাজে লাগে)"),
+                            vm.skipWorkflows, !vm.running,
+                        ) { vm.skipWorkflows = it; vm.scanFolder() }
+                        OutlinedButton(
+                            onClick = vm::scanFolder,
+                            enabled = vm.folderUri != null && !vm.scanning && !vm.running,
+                            shape = MaterialTheme.shapes.medium,
+                        ) { BtnLabel(Ic.Refresh, tr("আবার স্ক্যান")) }
+                }
+                SectionCard(Ic.Settings, tr("ভাষা ও থিম"), tr("অ্যাপের ভাষা এবং রং বাছাই করুন")) {
+                    ChoiceRow(
+                        listOf("বাংলা", "English"),
+                        if (Lang.english) 1 else 0,
+                    ) { Lang.setEnglish(ctx, it == 1) }
+                    ChoiceRow(
+                        listOf(tr("ফোনের মতো"), tr("লাইট"), tr("ডার্ক")),
+                        Lang.themeMode,
+                    ) { Lang.setTheme(ctx, it) }
+                }
+
+                TextButton(
+                    onClick = { logoutMode = 2 },
+                    enabled = !vm.running,
+                    colors = dangerColors,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { BtnLabel(Ic.Delete, tr("সব সেভ করা তথ্য মুছুন")) }
+            } else {
+            Hero(vm.account) { page = 1 }
+
+            var tab by remember { mutableStateOf(0) }
+            val hasActive = vm.runs.any { it.status != "completed" }
+            LaunchedEffect(tab) {
+                if (tab == 1) {
+                    vm.refreshRuns()
+                    vm.loadApkFiles()
+                }
+            }
+            // চলমান বিল্ড থাকলে প্রতি ৮ সেকেন্ডে নিজে থেকে রিফ্রেশ
+            LaunchedEffect(tab, hasActive) {
+                if (tab == 1 && hasActive) {
+                    while (true) {
+                        delay(8000)
+                        vm.refreshRuns(silent = true)
+                    }
+                }
+            }
+            SegmentedTabs(tab) { tab = it }
 
             if (tab == 0) {
                 // ধাপ ১ — অ্যাকাউন্ট
@@ -962,20 +1049,6 @@ private fun Screen(vm: MainViewModel = viewModel()) {
                             )
                         }
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = vm.rememberToken, onCheckedChange = { vm.rememberToken = it }, enabled = !vm.running)
-                        Text(tr("টোকেন এনক্রিপ্ট করে মনে রাখো"), style = MaterialTheme.typography.bodyMedium)
-                    }
-                    SwitchRow(
-                        tr("আপলোড শেষে নিজে লগআউট"),
-                        tr("সফল push-এর পর টোকেন ফোন থেকে মুছে যাবে"),
-                        vm.clearAfterPush, !vm.running,
-                    ) { vm.clearAfterPush = it }
-                    if (vm.token.isNotBlank()) {
-                        TextButton(onClick = { logoutMode = 1 }, enabled = !vm.running, colors = dangerColors) {
-                            BtnLabel(Ic.Logout, tr("লগআউট (টোকেন মুছুন)"))
-                        }
-                    }
                     Text(
                         tr("Classic: repo (প্রয়োজনে workflow)   ·   Fine-grained: Contents → Read and write"),
                         style = MaterialTheme.typography.bodySmall,
@@ -1013,21 +1086,12 @@ private fun Screen(vm: MainViewModel = viewModel()) {
                     )
                     Field(tr("ব্রাঞ্চ"), vm.branch, { vm.branch = it }, enabled = !vm.running)
                     Field(tr("কমিট মেসেজ"), vm.message, { vm.message = it }, enabled = !vm.running)
-                    SwitchRow(
-                        tr("রিপো না থাকলে বানাও"),
-                        tr("টোকেনে রিপো তৈরির অনুমতি লাগবে (Classic: repo)"),
-                        vm.createRepo, !vm.running,
-                    ) { vm.createRepo = it }
-                    if (vm.createRepo) {
-                        SwitchRow(tr("প্রাইভেট রিপো"), null, vm.privateRepo, !vm.running) { vm.privateRepo = it }
-                    }
                     if (showPicker) RepoPicker(vm) { showPicker = false }
                 }
 
                 // ধাপ ৩ — ফোল্ডার
                 StepCard(Ic.Folder, tr("৩. ফোল্ডার"), tr("যে প্রজেক্ট আপলোড করবেন"), vm.folderUri != null) {
                     var showPreview by remember { mutableStateOf(false) }
-                    var advanced by remember { mutableStateOf(false) }
 
                     FilledTonalButton(
                         onClick = { picker.launch(null) },
@@ -1079,35 +1143,6 @@ private fun Screen(vm: MainViewModel = viewModel()) {
                         }
                     }
 
-                    TextButton(onClick = { advanced = !advanced }) {
-                        BtnLabel(Ic.Settings, tr("অ্যাডভান্সড সেটিংস"))
-                        Spacer(Modifier.width(4.dp))
-                        Icon(
-                            if (advanced) Ic.ExpandLess else Ic.ExpandMore,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                    if (advanced) {
-                        Field(
-                            tr("রিপোর ভেতরের সাবফোল্ডার (ঐচ্ছিক)"), vm.subDir, { vm.subDir = it },
-                            enabled = !vm.running, hint = tr("ফাঁকা রাখলে রিপোর রুটে যাবে"),
-                        )
-                        Field(
-                            tr("বাদ দেওয়া নাম (কমা দিয়ে)"), vm.excludes, { vm.excludes = it },
-                            enabled = !vm.running, hint = tr("*.apk এর মতো এক্সটেনশনও দেওয়া যায়"),
-                        )
-                        SwitchRow(
-                            tr("workflows ফোল্ডার বাদ দিন"),
-                            tr(".github/workflows আপলোড হবে না (টোকেনে workflow অনুমতি না থাকলে কাজে লাগে)"),
-                            vm.skipWorkflows, !vm.running,
-                        ) { vm.skipWorkflows = it; vm.scanFolder() }
-                        OutlinedButton(
-                            onClick = vm::scanFolder,
-                            enabled = vm.folderUri != null && !vm.scanning && !vm.running,
-                            shape = MaterialTheme.shapes.medium,
-                        ) { BtnLabel(Ic.Refresh, tr("আবার স্ক্যান")) }
-                    }
 
                     Text(
                         tr("Download বা স্টোরেজের মূল ফোল্ডার বাছাই করা যায় না। তার ভেতরের প্রজেক্ট ফোল্ডারটি বাছাই করুন।"),
@@ -1221,25 +1256,9 @@ private fun Screen(vm: MainViewModel = viewModel()) {
                     }
                 }
 
-                SectionCard(Ic.Settings, tr("ভাষা ও থিম"), tr("অ্যাপের ভাষা এবং রং বাছাই করুন")) {
-                    ChoiceRow(
-                        listOf("বাংলা", "English"),
-                        if (Lang.english) 1 else 0,
-                    ) { Lang.setEnglish(ctx, it == 1) }
-                    ChoiceRow(
-                        listOf(tr("ফোনের মতো"), tr("লাইট"), tr("ডার্ক")),
-                        Lang.themeMode,
-                    ) { Lang.setTheme(ctx, it) }
-                }
-
-                TextButton(
-                    onClick = { logoutMode = 2 },
-                    enabled = !vm.running,
-                    colors = dangerColors,
-                    modifier = Modifier.fillMaxWidth(),
-                ) { BtnLabel(Ic.Delete, tr("সব সেভ করা তথ্য মুছুন")) }
             } else {
                 BuildsTab(vm)
+            }
             }
         }
     }
