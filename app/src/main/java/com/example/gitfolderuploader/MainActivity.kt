@@ -83,6 +83,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -199,6 +200,25 @@ private fun Hero(account: String?, onSettings: () -> Unit) {
     }
 }
 
+/** কিছু না থাকলে আইকনসহ ছোট বার্তা */
+@Composable
+private fun EmptyState(icon: ImageVector, text: String) {
+    val cs = MaterialTheme.colorScheme
+    Column(
+        Modifier.fillMaxWidth().padding(vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(icon, contentDescription = null, tint = cs.onSurfaceVariant.copy(alpha = 0.6f), modifier = Modifier.size(32.dp))
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = cs.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
 /** সেটিংস পেজের উপরের বার (পেছনে যাওয়ার বাটনসহ) */
 @Composable
 private fun SettingsTop(onBack: () -> Unit) {
@@ -297,8 +317,8 @@ private fun StepCard(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
-            Modifier.animateContentSize().padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            Modifier.animateContentSize().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(
                 modifier = Modifier
@@ -352,13 +372,13 @@ private fun SectionCard(
         shape = MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 IconBadge(icon, cs.primaryContainer, cs.onPrimaryContainer)
-                Column {
+                Column(Modifier.weight(1f)) {
                     Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     if (subtitle != null) {
                         Text(subtitle, style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
@@ -537,7 +557,7 @@ private fun BuildsTab(vm: MainViewModel) {
             }
         }
         if (vm.runs.isEmpty() && !vm.loadingRuns && vm.runsError == null) {
-            Text(tr("কোনো বিল্ড পাওয়া যায়নি"), style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
+            EmptyState(Ic.Build, tr("কোনো বিল্ড পাওয়া যায়নি"))
         }
 
         vm.runs.take(10).forEach { r ->
@@ -617,7 +637,7 @@ private fun BuildsTab(vm: MainViewModel) {
 
     SectionCard(Ic.SystemUpdate, tr("ডাউনলোড করা APK"), tr("ফোনে সংরক্ষিত — ইনস্টল বা মুছে ফেলুন")) {
         if (vm.apkFiles.isEmpty()) {
-            Text(tr("কোনো APK নেই"), style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
+            EmptyState(Ic.SystemUpdate, tr("কোনো APK নেই"))
         }
         vm.apkFiles.forEach { f ->
             Surface(
@@ -763,10 +783,9 @@ private fun RepoPicker(vm: MainViewModel, onDismiss: () -> Unit) {
                         Icon(Ic.Warning, contentDescription = null, tint = cs.error, modifier = Modifier.size(18.dp))
                         Text(vm.reposError ?: "", style = MaterialTheme.typography.bodyMedium, color = cs.error)
                     }
-                    list.isEmpty() -> Text(
+                    list.isEmpty() -> EmptyState(
+                        Ic.Search,
                         if (vm.repos.isEmpty()) tr("এই টোকেনে push করার মতো কোনো রিপো পাওয়া যায়নি") else tr("কিছু মেলেনি"),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = cs.onSurfaceVariant,
                     )
                     else -> {
                         Text(
@@ -859,7 +878,7 @@ private fun Screen(vm: MainViewModel = viewModel()) {
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             // লগআউট / সেভ করা তথ্য মোছার নিশ্চিতকরণ (১ = লগআউট, ২ = সব মুছুন)
             var logoutMode by remember { mutableStateOf(0) }
