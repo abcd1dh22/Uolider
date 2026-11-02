@@ -43,3 +43,16 @@ jobs:
         with:
           name: GitFolderUploader-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${{ github.run_number }}"
+          APK="GitFolderUploader-$TAG.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "$APK"
+          gh release create "$TAG" "$APK" \
+            --title "Git Folder Uploader $TAG" \
+            --notes "Automated build #${{ github.run_number }}" \
+            --target "$(git rev-parse HEAD)" \
+            || gh release upload "$TAG" "$APK" --clobber
