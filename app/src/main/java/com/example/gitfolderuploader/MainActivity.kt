@@ -17,6 +17,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.PaddingValues
@@ -150,69 +151,50 @@ private fun Hero(account: String?, onSettings: () -> Unit) {
         if (isDark()) listOf(Color(0xFF1E40AF), Color(0xFF4338CA))
         else listOf(Color(0xFF2563EB), Color(0xFF4F46E5))
     )
-    Box(
+    Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(brush)
-            .padding(20.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                Box(
-                    Modifier
-                        .size(50.dp)
-                        .background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(15.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Ic.CloudUpload, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
-                }
-                Column {
-                    Text(
-                        "Git Folder Uploader",
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        tr("আপনার ফোল্ডার, সোজা GitHub-এ"),
-                        color = Color.White.copy(alpha = 0.85f),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-                Spacer(Modifier.weight(1f))
-                IconButton(
-                    onClick = onSettings,
-                    modifier = Modifier.background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(14.dp)),
-                ) {
-                    Icon(Ic.Settings, contentDescription = tr("সেটিংস"), tint = Color.White)
-                }
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(Color.White.copy(alpha = 0.16f))
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-            ) {
+        Box(
+            Modifier
+                .size(40.dp)
+                .background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Ic.CloudUpload, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(
+                "Git Folder Uploader",
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     if (account != null) Ic.CheckCircle else Ic.Lock,
                     contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(16.dp),
+                    tint = Color.White.copy(alpha = 0.9f),
+                    modifier = Modifier.size(13.dp),
                 )
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(5.dp))
                 Text(
-                    if (account != null) L("@$account হিসেবে সংযুক্ত","Connected as @$account") else "এখনো লগইন করা নেই",
-                    color = Color.White,
+                    if (account != null) L("@$account হিসেবে সংযুক্ত", "Connected as @$account") else tr("এখনো লগইন করা নেই"),
+                    color = Color.White.copy(alpha = 0.9f),
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
                 )
             }
+        }
+        IconButton(
+            onClick = onSettings,
+            modifier = Modifier.background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(12.dp)),
+        ) {
+            Icon(Ic.Settings, contentDescription = tr("সেটিংস"), tint = Color.White)
         }
     }
 }
@@ -297,18 +279,32 @@ private fun StepCard(
     title: String,
     subtitle: String?,
     done: Boolean,
+    summary: String? = null,
+    autoCollapse: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
     val ok = successColor()
+    var expanded by remember { mutableStateOf(true) }
+    // ধাপ সম্পূর্ণ হলে নিজে গুটিয়ে যায়, অসম্পূর্ণ হলে আবার খোলে
+    LaunchedEffect(done) {
+        if (autoCollapse) expanded = !done
+    }
     Card(
         colors = CardDefaults.cardColors(containerColor = cs.surface),
         border = BorderStroke(1.dp, cs.outline),
         shape = MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(
+            Modifier.animateContentSize().padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
             Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(enabled = summary != null) { expanded = !expanded },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -317,14 +313,27 @@ private fun StepCard(
                     bg = if (done) ok.copy(alpha = 0.14f) else cs.primaryContainer,
                     fg = if (done) ok else cs.onPrimaryContainer,
                 )
-                Column {
+                Column(Modifier.weight(1f)) {
                     Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    if (subtitle != null) {
-                        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+                    val sub = if (!expanded && done && summary != null) summary else subtitle
+                    if (sub != null) {
+                        Text(
+                            sub,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (!expanded && done) ok else cs.onSurfaceVariant,
+                            maxLines = 1,
+                        )
                     }
                 }
+                if (summary != null) {
+                    Icon(
+                        if (expanded) Ic.ExpandLess else Ic.ExpandMore,
+                        contentDescription = null,
+                        tint = cs.onSurfaceVariant,
+                    )
+                }
             }
-            content()
+            if (expanded) content()
         }
     }
 }
@@ -840,13 +849,14 @@ private fun Screen(vm: MainViewModel = viewModel()) {
     }
 
     var page by remember { mutableStateOf(0) }
+    var tab by remember { mutableStateOf(0) }
     BackHandler(enabled = page == 1) { page = 0 }
 
     Surface(modifier = Modifier.fillMaxSize(), color = cs.background) {
+        Column(Modifier.systemBarsPadding().imePadding()) {
         Column(
             modifier = Modifier
-                .systemBarsPadding()
-                .imePadding()
+                .weight(1f)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -948,7 +958,6 @@ private fun Screen(vm: MainViewModel = viewModel()) {
             } else {
             Hero(vm.account) { page = 1 }
 
-            var tab by remember { mutableStateOf(0) }
             val hasActive = vm.runs.any { it.status != "completed" }
             LaunchedEffect(tab) {
                 if (tab == 1) {
@@ -969,7 +978,9 @@ private fun Screen(vm: MainViewModel = viewModel()) {
 
             if (tab == 0) {
                 // ধাপ ১ — অ্যাকাউন্ট
-                StepCard(Ic.Key, tr("১. অ্যাকাউন্ট"), tr("GitHub Access Token দিয়ে সংযুক্ত হন"), vm.account != null) {
+                StepCard(Ic.Key, tr("১. অ্যাকাউন্ট"), tr("GitHub Access Token দিয়ে সংযুক্ত হন"), vm.account != null,
+                    summary = vm.account?.let { L("@$it সংযুক্ত", "@$it connected") }, autoCollapse = true,
+                ) {
                     var visible by remember { mutableStateOf(false) }
                     if (vm.savedAccounts.isNotEmpty()) {
                         Row(
@@ -1060,6 +1071,7 @@ private fun Screen(vm: MainViewModel = viewModel()) {
                 StepCard(
                     Ic.Book, tr("২. রিপোজিটরি"), tr("কোথায় push হবে"),
                     vm.parseRepo(vm.repoInput) != null && vm.branch.isNotBlank(),
+                    summary = "${vm.repoInput.trim()}  ·  ${vm.branch}",
                 ) {
                     var showPicker by remember { mutableStateOf(false) }
                     FilledTonalButton(
@@ -1090,7 +1102,10 @@ private fun Screen(vm: MainViewModel = viewModel()) {
                 }
 
                 // ধাপ ৩ — ফোল্ডার
-                StepCard(Ic.Folder, tr("৩. ফোল্ডার"), tr("যে প্রজেক্ট আপলোড করবেন"), vm.folderUri != null) {
+                StepCard(Ic.Folder, tr("৩. ফোল্ডার"), tr("যে প্রজেক্ট আপলোড করবেন"), vm.folderUri != null,
+                    summary = vm.scanInfo?.let { L("${vm.folderName}  ·  ${it.count} টি ফাইল", "${vm.folderName}  ·  ${it.count} files") } ?: vm.folderName,
+                    autoCollapse = true,
+                ) {
                     var showPreview by remember { mutableStateOf(false) }
 
                     FilledTonalButton(
@@ -1152,7 +1167,57 @@ private fun Screen(vm: MainViewModel = viewModel()) {
                 }
 
                 // ধাপ ৪ — Push
+                if (vm.running || vm.logs.isNotEmpty() || vm.resultUrl != null) {
                 StepCard(Ic.CloudUpload, tr("৪. Push"), tr("এক কমিটে সব ফাইল · অ্যাপ বন্ধ করলেও চলবে"), vm.resultUrl != null) {
+                    if (vm.logs.isNotEmpty()) {
+                        Terminal("$ git push origin ${vm.branch}", vm.logs)
+                    }
+
+                    vm.resultUrl?.let { url ->
+                        Surface(
+                            color = ok.copy(alpha = 0.12f),
+                            shape = MaterialTheme.shapes.medium,
+                            border = BorderStroke(1.dp, ok.copy(alpha = 0.35f)),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Row(
+                                Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Icon(Ic.CheckCircle, contentDescription = null, tint = ok, modifier = Modifier.size(26.dp))
+                                Column {
+                                    Text(tr("কাজ শেষ!"), fontWeight = FontWeight.SemiBold, color = ok)
+                                    Text(
+                                        tr("এখন GitHub-এ গিয়ে দেখে নিতে পারেন"),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = cs.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                        FilledTonalButton(
+                            onClick = { uriHandler.openUri(url) },
+                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                        ) { BtnLabel(Ic.OpenInNew, tr("GitHub-এ দেখুন")) }
+                    }
+                }
+                }
+
+            } else {
+                BuildsTab(vm)
+            }
+            }
+        }
+        if (page == 0 && tab == 0) {
+            Surface(color = cs.surface, tonalElevation = 3.dp, shadowElevation = 8.dp) {
+                Column(
+                    Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     if (vm.running) {
                         OutlinedButton(
                             onClick = vm::cancel,
@@ -1219,47 +1284,9 @@ private fun Screen(vm: MainViewModel = viewModel()) {
                         )
                     }
 
-                    if (vm.logs.isNotEmpty()) {
-                        Terminal("$ git push origin ${vm.branch}", vm.logs)
-                    }
-
-                    vm.resultUrl?.let { url ->
-                        Surface(
-                            color = ok.copy(alpha = 0.12f),
-                            shape = MaterialTheme.shapes.medium,
-                            border = BorderStroke(1.dp, ok.copy(alpha = 0.35f)),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Row(
-                                Modifier.padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                Icon(Ic.CheckCircle, contentDescription = null, tint = ok, modifier = Modifier.size(26.dp))
-                                Column {
-                                    Text(tr("কাজ শেষ!"), fontWeight = FontWeight.SemiBold, color = ok)
-                                    Text(
-                                        tr("এখন GitHub-এ গিয়ে দেখে নিতে পারেন"),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = cs.onSurfaceVariant,
-                                    )
-                                }
-                            }
-                        }
-                        FilledTonalButton(
-                            onClick = { uriHandler.openUri(url) },
-                            shape = MaterialTheme.shapes.medium,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp),
-                        ) { BtnLabel(Ic.OpenInNew, tr("GitHub-এ দেখুন")) }
-                    }
                 }
-
-            } else {
-                BuildsTab(vm)
             }
-            }
+        }
         }
     }
 }
