@@ -43,6 +43,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var createRepo by mutableStateOf(false)
     var privateRepo by mutableStateOf(true)
     var clearAfterPush by mutableStateOf(false)
+    var skipWorkflows by mutableStateOf(false)
     var repos by mutableStateOf<List<RepoInfo>>(emptyList())
     var loadingRepos by mutableStateOf(false)
     var reposError by mutableStateOf<String?>(null)
@@ -55,6 +56,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var buildMsg by mutableStateOf<String?>(null)
     var buildMsgError by mutableStateOf(false)
     val apkFiles = mutableStateListOf<File>()
+
+    // সেভ করা অ্যাকাউন্টের নাম (একাধিক টোকেন)
+    val savedAccounts = mutableStateListOf<String>()
 
     // ধাপ ৩: ফোল্ডার
     var folderUri by mutableStateOf<Uri?>(null)
@@ -103,7 +107,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         createRepo = prefs.getBoolean("createRepo", false)
         privateRepo = prefs.getBoolean("privateRepo", true)
         clearAfterPush = prefs.getBoolean("clearAfterPush", false)
+        skipWorkflows = prefs.getBoolean("skipWorkflows", false)
         token = securePrefs?.getString("token", "") ?: ""
+        refreshAccounts()
 
         prefs.getString("folderUri", null)?.let { s ->
             val uri = Uri.parse(s)
@@ -115,6 +121,44 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         if (token.isNotBlank()) verifyToken()
+    }
+
+    private fun refreshAccounts() {
+        savedAccounts.clear()
+        savedAccounts.addAll(Accounts.list(securePrefs).map { it.first })
+    }
+
+    /** সেভ করা অন্য অ্যাকাউন্টে বদলায় */
+    fun switchAccount(name: String) {
+        if (UploadHub.running) return
+        val t = Accounts.list(securePrefs).firstOrNull { it.first == name }?.second ?: return
+        token = t
+        account = null
+        tokenError = null
+        repos = emptyList()
+        runs = emptyList()
+        buildMsg = null
+        repoInput = "$name/"
+        securePrefs?.edit()?.putString("token", t)?.apply()
+        verifyToken()
+    }
+
+    /** নতুন অ্যাকাউন্টের টোকেন দেওয়ার জন্য ঘর ফাঁকা করে */
+    fun newAccount() {
+        if (UploadHub.running) return
+        onTokenChange("")
+        repoInput = ""
+    }
+
+    /** একটি সেভ করা অ্যাকাউন্টের টোকেন ফোন থেকে মুছে ফেলে */
+    fun removeAccount(name: String) {
+        if (UploadHub.running) return
+        if (account == name) {
+            logout(clearAll = false)
+        } else {
+            Accounts.remove(securePrefs, name)
+            refreshAccounts()
+        }
     }
 
     fun onTokenChange(s: String) {
@@ -294,6 +338,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val login = fetchLogin(t)
                 account = login
+                if (rememberToken) {
+                    Accounts.save(securePrefs, login, t)
+                    refreshAccounts()
+                }
                 if (repoInput.isBlank()) repoInput = "$login/"
             } catch (e: Exception) {
                 account = null
@@ -329,7 +377,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 scanInfo = withContext(Dispatchers.IO) {
                     val root = DocumentFile.fromTreeUri(app, uri)
                         ?: throw GitHubException("ফোল্ডার খোলা যায়নি")
-                    val r = scanFolderTree(root, subDir.trim().trim('/'), parseExcludes())
+                    val r = scanFolderTree(root, subDir.trim().trim('/'), parseExcludes(), skipWorkflows)
                     ScanInfo(
                         count = r.files.size,
                         bytes = r.files.sumOf { it.size },
@@ -367,6 +415,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             .putBoolean("createRepo", createRepo)
             .putBoolean("privateRepo", privateRepo)
             .putBoolean("clearAfterPush", clearAfterPush)
+            .putBoolean("skipWorkflows", skipWorkflows)
             .putString("folderUri", folderUri?.toString())
             .apply()
         securePrefs?.edit()?.putString("token", if (rememberToken) token else "")?.apply()
@@ -397,6 +446,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             excludes = parseExcludes(),
             createRepo = createRepo,
             privateRepo = privateRepo,
+            skipWorkflows = skipWorkflows,
         )
         UploadHub.pendingUri = uri
         UploadHub.pendingClearAfter = clearAfterPush
@@ -415,6 +465,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun logout(clearAll: Boolean) {
         if (UploadHub.running) return
+        val oldToken = token.trim()
+        val lastLogin = account
         token = ""
         account = null
         tokenError = null
@@ -423,6 +475,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         runsError = null
         buildMsg = null
         securePrefs?.edit()?.remove("token")?.apply()
+        if (clearAll) Accounts.clear(securePrefs) else {
+            val a = account ?: lastLogin
+            if (a != null) Accounts.remove(securePrefs, a)
+            if (oldToken.isNotBlank()) Accounts.removeByToken(securePrefs, oldToken)
+        }
+        refreshAccounts()
 
         if (clearAll) {
             folderUri?.let {
@@ -442,6 +500,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             excludes = ".git, node_modules, build, .gradle, .idea, .DS_Store"
             createRepo = false
             privateRepo = true
+            skipWorkflows = false
             rememberToken = true
             UploadHub.logs.clear()
             UploadHub.resultUrl = null

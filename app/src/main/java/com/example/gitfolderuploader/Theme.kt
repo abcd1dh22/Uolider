@@ -67,12 +67,12 @@ internal val TermErr = Color(0xFFF87171)
 
 @Composable
 internal fun successColor(): Color =
-    if (isSystemInDarkTheme()) Color(0xFF4ADE80) else Color(0xFF16A34A)
+    if (isDark()) Color(0xFF4ADE80) else Color(0xFF16A34A)
 
 @Composable
 fun AppTheme(content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) DarkColors else LightColors,
+        colorScheme = if (isDark()) DarkColors else LightColors,
         shapes = AppShapes,
         content = content,
     )

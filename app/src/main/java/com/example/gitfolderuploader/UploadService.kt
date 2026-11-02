@@ -207,12 +207,10 @@ class UploadService : Service() {
 
     private fun removeToken() {
         try {
-            val key = MasterKey.Builder(this).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
-            EncryptedSharedPreferences.create(
-                this, "secure", key,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-            ).edit().remove("token").apply()
+            val sp = Accounts.securePrefs(this)
+            val t = sp?.getString("token", "") ?: ""
+            sp?.edit()?.remove("token")?.apply()
+            if (t.isNotBlank()) Accounts.removeByToken(sp, t)
         } catch (_: Exception) {
         }
     }

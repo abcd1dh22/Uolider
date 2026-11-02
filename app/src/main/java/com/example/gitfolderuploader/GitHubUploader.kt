@@ -37,6 +37,7 @@ data class UploadConfig(
     val excludes: List<String>,
     val createRepo: Boolean,
     val privateRepo: Boolean,
+    val skipWorkflows: Boolean = false,
 )
 
 internal const val MAX_FILE_BYTES = 25L * 1024 * 1024 // এর চেয়ে বড় ফাইল বাদ
@@ -46,7 +47,7 @@ internal data class LocalFile(val repoPath: String, val doc: DocumentFile, val s
 internal class ScanResult(val files: List<LocalFile>, val skipped: List<String>)
 
 /** ফোল্ডার ঘুরে সব ফাইলের তালিকা বানায় (git status-এর মতো প্রিভিউর জন্যও ব্যবহৃত) */
-internal fun scanFolderTree(root: DocumentFile, prefix: String, excludes: List<String>): ScanResult {
+internal fun scanFolderTree(root: DocumentFile, prefix: String, excludes: List<String>, skipWorkflows: Boolean = false): ScanResult {
     val files = ArrayList<LocalFile>()
     val skipped = ArrayList<String>()
 
@@ -60,7 +61,7 @@ internal fun scanFolderTree(root: DocumentFile, prefix: String, excludes: List<S
             if (isExcluded(name)) continue
             val path = if (base.isEmpty()) name else "$base/$name"
             when {
-                f.isDirectory -> walk(f, path)
+                f.isDirectory -> if (!(skipWorkflows && path.endsWith(".github/workflows"))) walk(f, path)
                 f.isFile -> {
                     val size = f.length()
                     if (size > MAX_FILE_BYTES) skipped += "$path (${size / 1048576}MB — অনেক বড়)"
@@ -252,7 +253,7 @@ class GitHubUploader(
         // ১. লোকাল ফাইল স্ক্যান
         log("📂 ফোল্ডার স্ক্যান হচ্ছে...")
         val scan = withContext(Dispatchers.IO) {
-            scanFolderTree(root, cfg.subDir.trim('/'), cfg.excludes)
+            scanFolderTree(root, cfg.subDir.trim('/'), cfg.excludes, cfg.skipWorkflows)
         }
         val files = scan.files
         scan.skipped.forEach { log("⚠️ বাদ: $it") }
